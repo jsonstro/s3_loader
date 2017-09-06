@@ -1,0 +1,130 @@
+###################################################################
+### DO NOT DELETE --- CONFIG FILE FOR BOTH s3_loader SCRIPTS!!! ###
+###################################################################
+
+### DEFAULT value, if there is one, is shown after defined value
+
+### AWS Options ###
+# Which region your VPC is set up in, usually from ~/.aws
+#region: # default - none
+
+# Which profile to select AWS credentials and config values from in ~/.aws
+#profile: # default - none
+
+# Which s3 bucket you use for secrets management
+#bucket: # default - none
+
+### Output Options ###
+# Whether to output secret to STDOUT, use when wrapping in another script
+output: false # default - false
+
+### MFA Options ###
+# NOTE This should be found automatically in your ~/.aws/config, override that value here
+# EXAMPLE mfa_serial "arn:aws:iam::1234567890:mfa/userid"
+#mfa_serial: # default - none
+
+### Encryption Options ###
+# Which certificate or cipher you'd like to use for CSE/SSE-C, if managing your own certs rather than using KMS or s3
+#cert: # default - none
+
+# Whether or not to use RSA for client-side encryption as default
+rsa: false # default - false
+
+### KMS Options ###
+# Set your prefered KMS Master Key ID here
+# EXAMPLE kms_key_id: "12345a67b-89c0-1234-5def-6ab78c90def12"
+#kms_key_id: # default - none
+
+# Set to true to override default SSE type of AES256
+kms: false # default - false
+
+# Set to true to force KMS envelope encryption in KMS mode
+envelope: false # default - false
+
+#####################################################
+### EXAMPLE Policy for an s3 bucket to ENSURE SSE ###
+### using either 'AES256' or 'aws:kms' is ENABLED ###
+#####################################################
+# {
+#  "Version": "2012-10-17",
+#  "Id": "PutObjPolicy",
+#  "Statement": [
+#    {
+#      "Sid": "DenyIncorrectEncryptionHeader",
+#      "Effect": "Deny",
+#      "Principal": "*",
+#      "Action": "s3:PutObject",
+#      "Resource": "arn:aws:s3:::YourBucket/*",
+#      "Condition": {
+#        "StringNotEquals": {
+#          "s3:x-amz-server-side-encryption": [ "AES256", "aws:kms" ]
+#        }
+#      }
+#    },
+#    {
+#      "Sid": "DenyUnEncryptedObjectUploads",
+#      "Effect": "Deny",
+#      "Principal": "*",
+#      "Action": "s3:PutObject",
+#      "Resource": "arn:aws:s3:::YourBucket/*",
+#      "Condition": {
+#        "Null": {
+#          "s3:x-amz-server-side-encryption": "true"
+#        }
+#      }
+#    }
+#  ]
+#}
+
+### EXAMPLE KMS Policy for Host Role in CloudFormation ###
+#         PolicyName: kmsEncryptDecryptAccess
+#         PolicyDocument:
+#           Version: "2012-10-17"
+#           Statement:
+#             -
+#               Action:
+#                 - "kms:Encrypt",
+#                  - "kms:Decrypt",
+#                  - "kms:ReEncrypt*",
+#                  - "kms:GenerateDataKey*",
+#                  - "kms:DescribeKey"
+#               Effect: Allow
+#               Resource: "*"
+
+### EXAMPLE KMS Key Policy to allow programatic access from a single host role
+# {
+# "Version": "2012-10-17",
+# "Id": "key-default-1",
+# "Statement": [
+#   {
+#     "Sid": "Enable IAM User Permissions",
+#     "Effect": "Allow",
+#     "Principal": {
+#       "AWS": [
+#         "arn:aws:iam::012345678901:root",
+#         "arn:aws:iam::012345678901:role/roleName"
+#       ]
+#     },
+#     "Action": "kms:*",
+#     "Resource": "*"
+#   },
+#   {
+#     "Sid": "Enable Host Role Permissions",
+#     "Effect": "Allow",
+#     "Principal": {
+#       "AWS": [
+#         "arn:aws:iam::012345678901:root",
+#         "arn:aws:iam::012345678901:role/stackName-InstanceHostRole-A1234567890B"
+#       ]
+#     },
+#     "Action": [
+#       "kms:Encrypt",
+#       "kms:Decrypt",
+#       "kms:ReEncrypt*",
+#       "kms:GenerateDataKey*",
+#       "kms:DescribeKey"
+#     ],
+#     "Resource": "*"
+#   }
+# ]
+#}

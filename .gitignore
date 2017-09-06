@@ -1,0 +1,5 @@
+.aws_session
+*.aes
+*.kms
+*.passwd*
+*.pem
