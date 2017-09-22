@@ -1,0 +1,76 @@
+#####################################################
+### EXAMPLE Policy for an s3 bucket to ENSURE SSE ###
+### using either 'AES256' or 'aws:kms' is ENABLED ###
+#####################################################
+ {
+  "Version": "2012-10-17",
+  "Id": "PutObjPolicy",
+  "Statement": [
+    {
+      "Sid": "DenyIncorrectEncryptionHeader",
+      "Effect": "Deny",
+      "Principal": "*",
+      "Action": "s3:PutObject",
+      "Resource": "arn:aws:s3:::YourBucket/*",
+      "Condition": {
+        "StringNotEquals": {
+          "s3:x-amz-server-side-encryption": [ "AES256", "aws:kms" ]
+        }
+      }
+    },
+    {
+      "Sid": "DenyUnEncryptedObjectUploads",
+      "Effect": "Deny",
+      "Principal": "*",
+      "Action": "s3:PutObject",
+      "Resource": "arn:aws:s3:::YourBucket/*",
+      "Condition": {
+        "Null": {
+          "s3:x-amz-server-side-encryption": "true"
+        }
+      }
+    }
+  ]
+}
+
+###################################################
+### EXAMPLE KMS Key Policy to allow programatic ###
+### access from a single host role ###
+###################################################
+
+{
+ "Version": "2012-10-17",
+ "Id": "key-default-1",
+ "Statement": [
+   {
+     "Sid": "Enable IAM User Permissions",
+     "Effect": "Allow",
+     "Principal": {
+       "AWS": [
+         "arn:aws:iam::012345678901:root",
+         "arn:aws:iam::012345678901:role/roleName"
+       ]
+     },
+     "Action": "kms:*",
+     "Resource": "*"
+   },
+   {
+     "Sid": "Enable Host Role Permissions",
+     "Effect": "Allow",
+     "Principal": {
+       "AWS": [
+         "arn:aws:iam::012345678901:root",
+         "arn:aws:iam::012345678901:role/stackName-InstanceHostRole-A1234567890B"
+       ]
+     },
+     "Action": [
+       "kms:Encrypt",
+       "kms:Decrypt",
+       "kms:ReEncrypt*",
+       "kms:GenerateDataKey*",
+       "kms:DescribeKey"
+     ],
+     "Resource": "*"
+   }
+ ]
+}

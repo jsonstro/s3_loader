@@ -17,7 +17,7 @@ require 'yaml'
 # Load this app's config
 dir = File.dirname(__FILE__)
 CNF = "#{dir}/s3_loader.yaml"
-CONF = YAML.load_file(CNF)
+conf = YAML.load_file(CNF)
 
 # Set AWS config file locations
 HOME = File.expand_path('~')
@@ -47,6 +47,7 @@ opt_parser = OptionParser.new do |opt|
   opt.separator  "(CONTEXT)  -> OPTIONAL Comma deliniated list of 'key=value' pairs to add as encryption context - 'kms' ONLY!"
   opt.separator  ""
   opt.separator  " * --> Configure defaults for OPTIONS and MFA in config file: #{CNF}"
+  opt.separator  " * --> Configure specific defaults for an AWS profile in a config file named 'PROFILE.yaml'"
   opt.separator  ""
   opt.separator  "OPTIONS"
   opt.on("-c","--cert CERT","Posix path to PEM-format RSA Public Key or AES256 Cipher to use for encryption") do |cert|
@@ -119,10 +120,18 @@ if ARGV[2] =~ /.*\=.*/ then
   ARGV[2] = nil
 end
 
+# Check PWD for yaml for specific profile
+prof = options[:profile] || conf['profile']
+CNF2 = "#{dir}/#{prof}.yaml"
+if File.exists?(CNF2) then
+  print "--> Found specific YAML config for profile: #{prof}.yaml\n"
+  conf.merge!(YAML.load_file(CNF2))
+end
+
 # Setup s3 bucket to upload into either from ARGV2 or conf
-bucket_name = ARGV[2] || CONF['bucket']
+bucket_name = ARGV[2] || conf['bucket']
 if bucket_name.nil? then
-  print "ERROR --> BUCKET name required! Add to CMD line or specify in #{CONF}\n"
+  print "ERROR --> BUCKET name required! Add to CMD line or specify in #{conf}\n"
   puts opt_parser
   exit
 elsif ARGV[2].nil? then
@@ -131,10 +140,9 @@ elsif ARGV[2].nil? then
 end
 
 # Configure the certificate or cipher to use from option or conf
-cert_to_use = options[:cert] || CONF['cert']
+cert_to_use = options[:cert] || conf['cert']
 
 # Which profile to use for creds from ~/.aws/credentials, default is 'default'
-prof = options[:profile] || CONF['profile']
 if prof.nil? then
   print "ERROR --> Credentials error, reading profile #{prof} from #{AWS_CREDENTIALS}\n"
   puts opt_parser
@@ -150,30 +158,30 @@ if File.exist?(AWS_CONFIG) then
   File.foreach(AWS_CONFIG) do |line|
     if(line =~ /\[.*#{prof}\]/ || toggle) then
       toggle = true
-      if(line =~ /^mfa_serial/ && CONF['mfa_serial'].nil?) then
-        CONF['mfa_serial'] = line.split("=").last.strip
+      if(line =~ /^mfa_serial/ && conf['mfa_serial'].nil?) then
+        conf['mfa_serial'] = line.split("=").last.strip
         if options[:verbose] == true then
-          puts "v-> Found MFA serial: #{CONF['mfa_serial']}"
+          puts "v-> Found MFA serial: #{conf['mfa_serial']}"
         end
       end
-      if(line =~ /^region/ && CONF['region'].nil?) then
-        CONF['region'] = line.split("=").last.strip
+      if(line =~ /^region/ && conf['region'].nil?) then
+        conf['region'] = line.split("=").last.strip
         if options[:verbose] == true then
-          puts "v-> Found region: #{CONF['region']}"
+          puts "v-> Found region: #{conf['region']}"
         end
       end
-      if(line =~ /^role_arn/ && CONF['role_arn'].nil?) then
-        CONF['role_arn'] = line.split("=").last.strip
+      if(line =~ /^role_arn/ && conf['role_arn'].nil?) then
+        conf['role_arn'] = line.split("=").last.strip
         if options[:verbose] == true then
-          puts "v-> Found role_arn: #{CONF['role_arn']}"
+          puts "v-> Found role_arn: #{conf['role_arn']}"
         end
       end
-      if(line =~ /^source_profile/ && CONF['source_profile'].nil?) then
-        CONF['source_profile'] = line.split("=").last.strip
+      if(line =~ /^source_profile/ && conf['source_profile'].nil?) then
+        conf['source_profile'] = line.split("=").last.strip
         if options[:verbose] == true then
-          puts "v-> Found source_profile: #{CONF['source_profile']}"
+          puts "v-> Found source_profile: #{conf['source_profile']}"
         end
-        prof = CONF['source_profile']
+        prof = conf['source_profile']
       end
       if line =~ /^\n/ then
         toggle = false
@@ -190,14 +198,14 @@ credentials = Aws::SharedCredentials.new(profile_name: "#{prof}")
 key_for_obj = options[:key] || File.basename(path_to_object)
 
 # Configure default region from options or conf, default is 'us-west-2'
-AWS_REGION = options[:region] || CONF['region']
+AWS_REGION = options[:region] || conf['region']
 if( AWS_REGION == '' || AWS_REGION == nil ) then
   print "ERROR --> AWS_REGION not found in config or yaml"
   exit
 end
 
 # Configure MFA Serial which looks like "arn:aws:iam::1234567890:mfa/userid", default is none
-AWS_MFA_SERIAL = options[:serial] || CONF['mfa_serial']
+AWS_MFA_SERIAL = options[:serial] || conf['mfa_serial']
 unless(AWS_MFA_SERIAL == '' || AWS_MFA_SERIAL.nil?) then
   userid = AWS_MFA_SERIAL.split("/").last
 else
@@ -206,13 +214,13 @@ else
 end
 
 # Configure if using RSA format for client-side, default is false
-FRSA = options[:rsa] || CONF['rsa']
+FRSA = options[:rsa] || conf['rsa']
 
 # Configure if using KMS for key management, default is false
-KMS = options[:kms] || CONF['kms'] # true/false
+KMS = options[:kms] || conf['kms'] # true/false
 
 # Load our default KMS Master Key ID from the config or option
-kms_key_id = options[:kms_key_id] || CONF['kms_key_id']
+kms_key_id = options[:kms_key_id] || conf['kms_key_id']
 
 # Configure the STS session (MFA token) info then make some credentials based on 'em
 session = ''
@@ -222,7 +230,7 @@ newsession = true
 unless(AWS_MFA_SERIAL == '' || AWS_MFA_SERIAL.nil?) then
   # Startup a new STS client to configure an AWS session
   sts = Aws::STS::Client.new(region: AWS_REGION, credentials: credentials)
-  unless CONF['role_arn'].nil? then
+  unless conf['role_arn'].nil? then
     # We get here if we have role switching enabled
     if File.exist?(sessionfile) then
       # Check for age of token
@@ -244,7 +252,7 @@ unless(AWS_MFA_SERIAL == '' || AWS_MFA_SERIAL.nil?) then
       else
         AWS_MFA_TOKEN = options[:token]
       end
-      session = sts.assume_role(role_arn: CONF['role_arn'], role_session_name: "#{userid}", duration_seconds: ses_exp, external_id: "UCSCAWS", serial_number: AWS_MFA_SERIAL, token_code: AWS_MFA_TOKEN)
+      session = sts.assume_role(role_arn: conf['role_arn'], role_session_name: "#{userid}", duration_seconds: ses_exp, external_id: "UCSCAWS", serial_number: AWS_MFA_SERIAL, token_code: AWS_MFA_TOKEN)
       creds = Aws::Credentials.new(session.credentials.access_key_id, session.credentials.secret_access_key, session.credentials.session_token)
       token = session.to_h.to_json
       File.open(sessionfile, 'wb') { |file| file.write(token) }
@@ -290,7 +298,7 @@ if ARGV[0] != "cse" then
 end
 
 # Also configure default kms_key_id and if using envelope encrytion
-ENVENC = options[:envelope] || CONF['envelope'] # true/false
+ENVENC = options[:envelope] || conf['envelope'] # true/false
 
 # This next bit checks if we have provided encryption context and puts it into a hash if so
 context = ''

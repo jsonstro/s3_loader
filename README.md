@@ -1,12 +1,20 @@
 ## *** README for s3_loader ***
 
-The intention of this project is to assist with managing secrets using OPSWorks Stacks; offering many ways to encrypt a secret & store it in s3.
+The intention of this project is to assist with managing secrets using OPSWorks Stacks. It offers many ways to encrypt a secret & store it in s3. Assumes you are using roles or at minimum are a named user in your AWS account. 
+
+The decryption script will enable you to verify your work. It also will decrpyt the secret to standard out (if requested), so it may be wrapped for automation in another script via the shell.
 
  - Help is available from the script by providing the '-h' or "--help" options.
- - Config options can be specified either from the cmd line options or in a config file called 's3_loader.yaml'.
- - Script will use your normal AWS environment configuration in ~/.aws/credentials and ~/.aws/config respectively. 
+ - General config options can be specified either from the cmd line flags or in a config file in current directory called 's3_loader.yaml'.
+   * Override individual settings per AWS profile in a YAML file called '<PROFILE>.yaml', where <PROFILE> is the EXACT name/case of profile name in .aws/config
+   * For example if you have "[profile AWS-Test]" in your .aws/config, your profile YAML file should be called 'AWS-Test.yaml'
+ - Script will honor your normal AWS environment configuration in ~/.aws/credentials and ~/.aws/config respectively. 
  - KMS mode will allow for encryption context, a comma separated list of arbitrary 'key=value' pairs that should be able to be programatically generated, e.g. layer=AppLayer or dir=/some/path/to/file or user=autosys,table=autora1. List of keys will be stored in metadata of object.
- - With KMS envelope encryption the datakey will be stored encrypted alongside the object in s3 with an extension of '.ekey'
+ - With KMS envelope encryption the datakey will be stored encrypted alongside the object in s3 with an extension of '.ekey'.
+ - The encryption script verifies that the bucket is not publically readable before pushing your secret and will fail if ACLs are too wide.
+ - The script offers cipher/key generation for both AES and RSA client-side encryption as well as KMS key selection/creation when '-m' flag or 'kms' modes are used.
+
+In the './examples' dir you can find demo chef code to decode each method and type of encryption below, as well as example AWS s3 bucket policies to limit a bucket's uploads to be encrypted.
 
 I. List of available uses is below:
 1. __Mode CSE__

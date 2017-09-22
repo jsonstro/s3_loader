@@ -3,3 +3,5 @@
 *.kms
 *.passwd*
 *.pem
+!s3_loader.yaml
+*.yaml
